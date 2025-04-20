@@ -1,12 +1,11 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-use std::{
-    sync::{Arc, Mutex},
-    thread,
-    time::{Duration, SystemTime},
-};
+mod config;
+mod db;
 
-use eframe::egui::{self, Ui};
+use std::time::{Duration, SystemTime};
+
+use eframe::egui::{self, FontId, RichText, Ui};
 
 fn main() -> eframe::Result {
     //env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
@@ -17,7 +16,7 @@ fn main() -> eframe::Result {
         ..Default::default()
     };
     eframe::run_native(
-        "Hello Kitty Work",
+        "Hello Work",
         options,
         Box::new(|cc| {
             // This gives us image support:
@@ -35,11 +34,24 @@ struct Pomo {
 }
 
 impl Pomo {
+    fn is_running(&self) -> bool {
+        self.session_start.is_some()
+    }
     fn init_session(&mut self) {
         self.session_start = Some(SystemTime::now())
     }
-    fn stop_session(&mut self) {
+    fn cancel_session(&mut self) {
         self.session_start = None
+    }
+    fn finish_session(&mut self) {
+        self.session_start = None
+    }
+    fn check_finished(&mut self) {
+        self.time_elapsed().map(|elapsed| {
+            if elapsed.as_secs() >= self.session_length {
+                self.finish_session();
+            }
+        });
     }
     fn time_elapsed(&self) -> Option<Duration> {
         self.session_start.and_then(|s| s.elapsed().ok())
@@ -49,7 +61,7 @@ impl Pomo {
             Some(t) => {
                 let secs = t.as_secs();
                 let rem = self.session_length - secs;
-                format!("{}:{}", rem / 60, rem % 60)
+                format!("{:02}:{:02}", rem / 60, rem % 60)
             }
             None => "--:--".to_owned(),
         }
@@ -59,7 +71,7 @@ impl Pomo {
 impl Default for Pomo {
     fn default() -> Self {
         Self {
-            project: "Arthur".to_owned(),
+            project: "Studying".to_owned(),
             session_start: None,
             session_length: 25 * 60,
         }
@@ -68,28 +80,25 @@ impl Default for Pomo {
 
 fn mini_ui(pomo: &mut Pomo, ui: &mut Ui) {
     ui.heading(format!("{}", pomo.project));
-    //ui.add(egui::Slider::new(&mut pomo.time_elapsed, 0..=120).text("age"));
-    if ui.button("Start").clicked() {
-        pomo.init_session()
-    }
+    ui.label(RichText::new(pomo.countdown_string()).font(FontId::proportional(40.0)));
 }
 
 fn main_ui(pomo: &mut Pomo, ui: &mut Ui) {
-    ui.heading("Hello Kitty Work");
+    ui.heading("Hello Work");
     ui.horizontal(|ui| {
-        let name_label = ui.label("Project name: ");
+        let name_label = ui.label("Project: ");
         ui.text_edit_singleline(&mut pomo.project)
             .labelled_by(name_label.id);
     });
-    //ui.add(egui::Slider::new(&mut pomo.time_elapsed, 0..=120).text("age"));
-    if ui.button("Start").clicked() {
-        pomo.init_session()
+    let button = ui.button(if pomo.is_running() { "Cancel" } else { "Start" });
+    if button.clicked() {
+        if !pomo.is_running() {
+            pomo.init_session()
+        } else {
+            pomo.cancel_session();
+        }
     }
-    ui.label(format!(
-        "Project: '{}', Time: {}",
-        pomo.project,
-        pomo.countdown_string()
-    ));
+    ui.label(RichText::new(pomo.countdown_string()).font(FontId::proportional(40.0)));
 }
 
 impl eframe::App for Pomo {
@@ -104,7 +113,8 @@ impl eframe::App for Pomo {
 
         // repaint once the timer ticks to a whole second
         self.time_elapsed().map(|x| {
-            ctx.request_repaint_after(Duration::from_millis(1000 - x.subsec_millis() as u64))
+            ctx.request_repaint_after(Duration::from_millis(1000 - x.subsec_millis() as u64));
         });
+        self.check_finished();
     }
 }
