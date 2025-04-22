@@ -6,7 +6,7 @@ mod projects;
 
 use std::time::{Duration, SystemTime};
 
-use eframe::egui::{self, FontId, RichText, Ui};
+use eframe::egui::{self, FontId, Id, PointerButton, RichText, Sense, Ui, ViewportCommand};
 use projects::Projects;
 use rusqlite::Connection;
 
@@ -154,6 +154,15 @@ fn main_ui(pomo: &mut Pomo, ui: &mut Ui) {
 impl eframe::App for Pomo {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
+            let window_move_response = ui.interact(
+                ui.max_rect(),
+                Id::new("window_move"),
+                Sense::click_and_drag(),
+            );
+            if window_move_response.drag_started_by(PointerButton::Primary) {
+                ctx.send_viewport_cmd(ViewportCommand::StartDrag);
+            }
+
             if ui.available_width() > 200.0 && ui.available_height() > 200.0 {
                 ctx.send_viewport_cmd(egui::ViewportCommand::WindowLevel(
                     egui::WindowLevel::Normal,
