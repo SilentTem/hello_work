@@ -8,7 +8,7 @@ pub fn config_dir() -> PathBuf {
         .config_dir()
         .to_owned();
     if !dir.exists() {
-        fs::create_dir(&dir).expect("Failed to create config directory");
+        fs::create_dir_all(&dir).expect("Failed to create config directory");
     }
     dir
 }
