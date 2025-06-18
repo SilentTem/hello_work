@@ -28,11 +28,11 @@ impl Projects {
         &self.projects
     }
     pub fn add(&mut self, project: Project, conn: &Connection) {
-        db::add_project(conn, &project);
-        self.projects.push(project);
+        db::add_project(conn, &project).expect("Failed to add project");
+        self.fetch(conn);
     }
-    pub fn set_active(&mut self, id: i32) {
-        self.active = self.projects.iter().position(|x| x.id == id);
+    pub fn set_active(&mut self, id: Option<i32>) {
+        self.active = id.and_then(|id| self.projects.iter().position(|x| x.id == id));
     }
     pub fn get_active(&self) -> Option<&Project> {
         self.active.and_then(|x| self.projects.get(x))

@@ -13,10 +13,24 @@ pub struct Project {
     pub name: String,
     pub target_hours: Option<f32>,
     pub parent: Option<i32>,
+    pub children: Vec<i32>,
 }
 
 pub fn get_projects(db: &Connection) -> Result<Vec<Project>> {
-    let mut stmt = db.prepare("SELECT id, name, target_hours, parent FROM projects")?;
+    let mut stmt = db.prepare(
+        "SELECT 
+            p.id,
+            p.name,
+            p.target_hours,
+            p.parent,
+            GROUP_CONCAT(c.id) AS children
+        FROM 
+            projects p
+        LEFT JOIN 
+            projects c ON p.id = c.parent
+        GROUP BY 
+            p.id;",
+    )?;
     let projects = stmt
         .query_map([], |row| {
             Ok(Project {
@@ -24,6 +38,10 @@ pub fn get_projects(db: &Connection) -> Result<Vec<Project>> {
                 name: row.get(1)?,
                 target_hours: row.get(2)?,
                 parent: row.get(3)?,
+                children: row
+                    .get::<_, Option<String>>(4)?
+                    .map(|s| s.split(",").map(|x| x.parse().unwrap()).collect())
+                    .unwrap_or_default(),
             })
         })?
         .collect();
