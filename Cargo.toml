@@ -4,7 +4,13 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-iced = { git = "https://github.com/iced-rs/iced", branch = "master", features = ["smol"] }
-# iced = { version = "0.13.1", features = ["smol"] }
+pliced = { git = "https://github.com/kunerd/pliced", rev = "8fff52c7426df2f7b86487e2e90ffdb129bfb300" }
 directories = "6.0.0"
 rusqlite = { version = "0.35.0", features = ["bundled"] }
+#plotters = "0.3"
+#iced = { version = "0.13.1", features = ["smol", "wgpu"] }
+
+[dependencies.iced]
+git = "https://github.com/iced-rs/iced.git"
+rev = "4b075b9731f4658a885357024cc77dee10e223c3" # match to pliced version
+features = ["smol"]

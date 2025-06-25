@@ -5,9 +5,11 @@ mod db;
 mod pomo;
 mod projects;
 
+use iced::Length;
 use iced::Padding;
 use iced::Size;
 use iced::widget::center_x;
+use iced::widget::container;
 use iced::widget::pick_list;
 use iced::widget::right;
 use iced::widget::scrollable;
@@ -21,6 +23,8 @@ use iced::widget::MouseArea;
 use iced::widget::{button, center, column, row, text};
 use iced::window;
 use iced::{Center, Element, Subscription, Theme};
+//use plotters::prelude::*;
+use pliced::{Chart, line_series, point_series};
 use std::time::Duration;
 
 use crate::db::Project;
@@ -28,10 +32,10 @@ use crate::db::Project;
 const MAIN_W: f32 = 400.0;
 const MAIN_H: f32 = 600.0;
 const MINI_W: f32 = 110.0;
-const MINI_H: f32 = 70.0;
+const MINI_H: f32 = 65.0;
 
 pub fn main() -> iced::Result {
-    iced::application(Stopwatch::default, Stopwatch::update, Stopwatch::view)
+    iced::application("Hello Work", Stopwatch::update, Stopwatch::view)
         .subscription(Stopwatch::subscription)
         .theme(Stopwatch::theme)
         .window_size(Size::new(MAIN_W, MAIN_H))
@@ -190,7 +194,26 @@ impl Stopwatch {
     }
 
     fn stats_tab_view(&self) -> Element<Message> {
-        center(column![]).into()
+        let data = (-50..=50)
+            .map(|x| x as f32 / 50.0)
+            .map(|x| (x, x * x))
+            .collect::<Vec<_>>();
+        container(
+            Chart::new()
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .push_series(
+                    line_series(data.iter().copied()).color(iced::Color::from_rgb8(255, 0, 0)),
+                )
+                .push_series(
+                    line_series(data.iter().copied().map(|(x, y)| (x, y * 0.5)))
+                        .color(iced::Color::from_rgb8(0, 255, 0)),
+                )
+                .push_series(point_series(
+                    data.iter().copied().map(|(x, y)| (x + 0.5, y * 2.0)),
+                )),
+        )
+        .into()
     }
 
     fn view(&self) -> Element<Message> {
