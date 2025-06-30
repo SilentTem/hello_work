@@ -12,6 +12,7 @@ use chrono::Utc;
 use iced::Length;
 use iced::Padding;
 use iced::Size;
+use iced::application::Title;
 use iced::widget::center_x;
 use iced::widget::container;
 use iced::widget::pick_list;
@@ -39,7 +40,7 @@ const MINI_W: f32 = 110.0;
 const MINI_H: f32 = 65.0;
 
 pub fn main() -> iced::Result {
-    iced::application("Hello Work", App::update, App::view)
+    iced::application(App::title, App::update, App::view)
         .subscription(App::subscription)
         .theme(App::theme)
         .window_size(Size::new(MAIN_W, MAIN_H))
@@ -149,6 +150,14 @@ impl App {
         }
 
         Subscription::batch(vec![tick, keyboard::on_key_press(handle_hotkey)])
+    }
+
+    fn title(&self) -> String {
+        self.pomo
+            .projects
+            .get_active()
+            .map(|p| (p.name.clone() + " - Hello Work"))
+            .unwrap_or("Hello Work".to_string())
     }
 
     fn mini_window_view(&self) -> Element<Message> {
