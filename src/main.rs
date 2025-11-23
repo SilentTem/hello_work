@@ -14,6 +14,7 @@ use iced::Length;
 use iced::Padding;
 use iced::Size;
 use iced::application::Title;
+use iced::system;
 use iced::widget::center_x;
 use iced::widget::container;
 use iced::widget::pick_list;
@@ -32,6 +33,7 @@ use iced::window;
 use iced::{Center, Element, Subscription, Theme};
 use pliced::{Chart, line_series, point_series};
 use plotters::prelude::*;
+use std::env;
 use std::time::Duration;
 
 use crate::db::Project;
@@ -96,35 +98,50 @@ impl App {
             }
             Message::MiniWindowToggle => {
                 self.mini_window = !self.mini_window;
+
+                let is_wayland = match env::var("XDG_SESSION_TYPE") {
+                    Ok(val) => val == "wayland",
+                    Err(_) => false,
+                };
+
+                // If we're working under Wayland, create a new window with the
+                // desired size, otherwise modify the current window.
+                // This is because Wayland doesn't let us modify our current window
+                // effectively, for some reason.
+
                 if self.mini_window {
-                    return window::get_latest().and_then(|window_id| -> Task<Message> {
-                        let mut settings = Settings::default();
-                        settings.size = Size::new(MINI_W, MINI_H);
-                        settings.decorations = false;
-                        settings.level = Level::AlwaysOnTop;
-                        window::close(window_id).chain(window::open(settings).1.discard())
-                    });
-
-                    /*return window::get_latest().and_then(|window_id| -> Task<Message> {
-                        window::set_level::<Message>(window_id, window::Level::AlwaysOnTop)
-                            .chain(window::resize(window_id, Size::new(100.0, 80.0)))
-                            .chain(window::toggle_decorations(window_id))
-                    });*/
-                } else {
-                    self.current_tab = Tab::Main; // Always switch to main tab, stats tab crashes when coming from mini
-                    return window::get_latest().and_then(|window_id| -> Task<Message> {
-                        window::close(window_id).chain({
+                    if is_wayland {
+                        return window::get_latest().and_then(|window_id| -> Task<Message> {
                             let mut settings = Settings::default();
-                            settings.size = Size::new(MAIN_W, MAIN_H);
-                            window::open(settings).1.discard()
-                        })
-                    });
-
-                    /*return window::get_latest().and_then(|window_id| -> Task<Message> {
-                        window::set_level::<Message>(window_id, window::Level::Normal)
-                            .chain(window::resize(window_id, Size::new(400.0, 200.0)))
-                            .chain(window::toggle_decorations(window_id))
-                    });*/
+                            settings.size = Size::new(MINI_W, MINI_H);
+                            settings.decorations = false;
+                            settings.level = Level::AlwaysOnTop;
+                            window::close(window_id).chain(window::open(settings).1.discard())
+                        });
+                    } else {
+                        return window::get_latest().and_then(|window_id| -> Task<Message> {
+                            window::set_level::<Message>(window_id, window::Level::AlwaysOnTop)
+                                .chain(window::resize(window_id, Size::new(MINI_W, MINI_H)))
+                                .chain(window::toggle_decorations(window_id))
+                        });
+                    }
+                } else {
+                    if is_wayland {
+                        self.current_tab = Tab::Main; // Always switch to main tab, stats tab crashes when coming from mini
+                        return window::get_latest().and_then(|window_id| -> Task<Message> {
+                            window::close(window_id).chain({
+                                let mut settings = Settings::default();
+                                settings.size = Size::new(MAIN_W, MAIN_H);
+                                window::open(settings).1.discard()
+                            })
+                        });
+                    } else {
+                        return window::get_latest().and_then(|window_id| -> Task<Message> {
+                            window::set_level::<Message>(window_id, window::Level::Normal)
+                                .chain(window::resize(window_id, Size::new(MAIN_W, MAIN_H)))
+                                .chain(window::toggle_decorations(window_id))
+                        });
+                    }
                 }
             }
             Message::ProjectSelected(project) => {
