@@ -6,6 +6,7 @@ mod pomo;
 mod projects;
 mod stats;
 
+use chrono::Datelike;
 use chrono::Days;
 use chrono::NaiveDate;
 use chrono::Utc;
@@ -308,7 +309,13 @@ impl pliced::Program<Message> for App {
             )
             .unwrap();
 
-        chart.configure_mesh().draw().unwrap();
+        chart
+            .configure_mesh()
+            .label_style(TextStyle::from(("sans-serif", 15).into_font()).color(&WHITE))
+            // take out the year display from the dates
+            .x_label_formatter(&|x| format!("{}-{}", x.month(), x.day()))
+            .draw()
+            .unwrap();
 
         chart
             .draw_series(
