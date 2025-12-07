@@ -121,8 +121,11 @@ impl App {
                     } else {
                         return window::get_latest().and_then(|window_id| -> Task<Message> {
                             window::set_level::<Message>(window_id, window::Level::AlwaysOnTop)
-                                .chain(window::resize(window_id, Size::new(MINI_W, MINI_H)))
                                 .chain(window::toggle_decorations(window_id))
+                                .chain(window::resize(window_id, Size::new(MINI_W, MINI_H)))
+                            // the order matters, first toggle decorations then resize
+                            // to avoid ending up with a larger than intended window,
+                            // as Windows compensates for the lost decoration space by growing the inner size
                         });
                     }
                 } else {
