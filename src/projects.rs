@@ -1,3 +1,5 @@
+use std::iter;
+
 use rusqlite::Connection;
 
 use crate::db::{self, Project};
@@ -22,8 +24,34 @@ impl Projects {
         self.projects
             .append(&mut db::get_projects(conn).expect("Failed to fetch projects"));
     }
-    pub fn get(&self) -> &[Project] {
+    pub fn get_all(&self) -> &[Project] {
         &self.projects
+    }
+    pub fn get_all_tree_style(&self) -> Vec<(usize, &Project)> {
+        fn recurse<'a>(
+            project: &'a Project,
+            all_projects: &'a [Project],
+            depth: usize,
+        ) -> Vec<(usize, &'a Project)> {
+            iter::once((depth, project))
+                .chain(
+                    project
+                        .children
+                        .iter()
+                        .map(|id| all_projects.iter().find(|p| p.id == *id).unwrap())
+                        .flat_map(|p| recurse(p, all_projects, depth + 1)),
+                )
+                .collect()
+        }
+        let all_projects = self.get_all();
+        all_projects
+            .iter()
+            .filter(|p| p.parent.is_none())
+            .flat_map(|p| recurse(p, all_projects, 0))
+            .collect()
+    }
+    pub fn get(&self, id: i32) -> Option<&Project> {
+        self.projects.iter().find(|p| p.id == id)
     }
     pub fn add(&mut self, project: Project, conn: &Connection) {
         db::add_project(conn, &project).expect("Failed to add project");

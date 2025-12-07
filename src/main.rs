@@ -8,15 +8,10 @@ mod stats;
 
 use chrono::Datelike;
 use chrono::Days;
-use chrono::NaiveDate;
 use chrono::Utc;
-use iced::Length;
 use iced::Padding;
 use iced::Size;
-use iced::application::Title;
-use iced::system;
 use iced::widget::center_x;
-use iced::widget::container;
 use iced::widget::pick_list;
 use iced::widget::right;
 use iced::widget::scrollable;
@@ -31,12 +26,11 @@ use iced::widget::MouseArea;
 use iced::widget::{button, center, column, row, text};
 use iced::window;
 use iced::{Center, Element, Subscription, Theme};
-use pliced::{Chart, line_series, point_series};
+use pliced::Chart;
 use plotters::prelude::*;
 use std::env;
+use std::iter;
 use std::time::Duration;
-
-use crate::db::Project;
 
 const MAIN_W: f32 = 400.0;
 const MAIN_H: f32 = 600.0;
@@ -74,7 +68,7 @@ enum Message {
     Tick,
     DragMove,
     MiniWindowToggle,
-    ProjectSelected(Project),
+    ProjectSelected(i32),
     TabSelected(Tab),
     SessionLengthChanged(String),
 }
@@ -147,8 +141,8 @@ impl App {
                     }
                 }
             }
-            Message::ProjectSelected(project) => {
-                self.pomo.projects.set_active(Some(project.id));
+            Message::ProjectSelected(id) => {
+                self.pomo.projects.set_active(Some(id));
             }
             Message::TabSelected(tab) => {
                 self.current_tab = tab;
@@ -212,10 +206,24 @@ impl App {
         };
 
         let project_picker = pick_list(
-            self.pomo.projects.get(),
+            self.pomo
+                .projects
+                .get_all_tree_style()
+                .into_iter()
+                .map(|(depth, p)| {
+                    let mut p = p.clone();
+                    p.name = (0..depth)
+                        .map(|_| " ")
+                        .chain(iter::once("▹"))
+                        .collect::<String>()
+                        + &p.name;
+                    p
+                })
+                .collect::<Vec<_>>(),
             self.pomo.projects.get_active(),
-            |p| Message::ProjectSelected(p),
-        );
+            |p| Message::ProjectSelected(p.id),
+        )
+        .font(iced::Font::MONOSPACE);
 
         center(
             column![duration, toggle_button, project_picker]
@@ -227,11 +235,26 @@ impl App {
 
     fn projects_tab_view(&self) -> Element<Message> {
         let projects_list = center(scrollable(column(
-            self.pomo.projects.get().into_iter().map(|p| {
-                row![button(text!("{}", p.name)), right(button("..."))]
-                    .padding([4, 30])
+            self.pomo
+                .projects
+                .get_all_tree_style()
+                .into_iter()
+                .map(|(depth, p)| {
+                    row![
+                        text(if depth != 0 {
+                            (0..depth)
+                                .map(|_| " ")
+                                .chain(iter::once("└"))
+                                .collect::<String>()
+                        } else {
+                            "".to_string()
+                        })
+                        .font(iced::Font::MONOSPACE),
+                        button(text!("{}", p.name).font(iced::Font::MONOSPACE)),
+                        right(button("..."))
+                    ]
                     .into()
-            }),
+                }),
         )));
 
         projects_list.into()

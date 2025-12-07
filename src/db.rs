@@ -9,7 +9,7 @@ pub fn init_db(path: &Path) -> Connection {
     conn
 }
 
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Clone, Debug, Default)]
 pub struct Project {
     pub id: i32,
     pub name: String,
