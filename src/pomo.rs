@@ -1,6 +1,6 @@
 use crate::{config, db, projects::Projects};
 use rusqlite::Connection;
-use std::time::{Duration, Instant, SystemTime};
+use std::time::{Duration, SystemTime};
 
 pub struct Pomo {
     pub session_length: u64,

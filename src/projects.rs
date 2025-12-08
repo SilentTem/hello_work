@@ -52,12 +52,13 @@ impl Projects {
             .flat_map(|p| recurse(p, all_projects, 0))
             .collect()
     }
-    pub fn get(&self, id: usize) -> Option<&Project> {
+    /*pub fn get(&self, id: usize) -> Option<&Project> {
         self.projects.iter().find(|p| p.id == id)
-    }
-    pub fn add(&mut self, project: Project, conn: &Connection) {
-        db::add_project(conn, &project).expect("Failed to add project");
+    }*/
+    pub fn add(&mut self, parent: Option<usize>, conn: &Connection) {
+        let id = db::add_project(conn, parent).expect("Failed to add project");
         self.fetch(conn);
+        self.initiate_edit(Some(id));
     }
     pub fn set_active(&mut self, id: Option<usize>) {
         self.active = id;
@@ -91,5 +92,12 @@ impl Projects {
         if let Some(edited) = self.edited.as_mut() {
             edited.name = name;
         }
+    }
+    pub fn delete_edited_item(&mut self, conn: &Connection) {
+        if let Some(edited) = self.edited.as_ref() {
+            db::delete_project(conn, edited.id).expect("Failed to delete project");
+        }
+        self.edited = None;
+        self.fetch(conn);
     }
 }

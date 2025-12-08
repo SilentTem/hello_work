@@ -70,8 +70,10 @@ enum Message {
     DragMove,
     MiniWindowToggle,
     ProjectSelected(usize),
+    NewProject { parent: Option<usize> },
     EditProjectInitiate(usize),
     EditProjectFinish,
+    EditProjectDelete,
     EditProjectNameInput(String),
     TabSelected(Tab),
     SessionLengthChanged(String),
@@ -148,6 +150,9 @@ impl App {
             Message::ProjectSelected(id) => {
                 self.pomo.projects.set_active(Some(id));
             }
+            Message::NewProject { parent } => {
+                self.pomo.projects.add(parent, &self.pomo.db);
+            }
             Message::EditProjectInitiate(id) => {
                 self.pomo.projects.initiate_edit(Some(id));
             }
@@ -156,6 +161,9 @@ impl App {
             }
             Message::EditProjectNameInput(name) => {
                 self.pomo.projects.set_edited_name(name);
+            }
+            Message::EditProjectDelete => {
+                self.pomo.projects.delete_edited_item(&self.pomo.db);
             }
             Message::TabSelected(tab) => {
                 self.current_tab = tab;
@@ -248,75 +256,87 @@ impl App {
 
     fn projects_tab_view(&self) -> Element<Message> {
         let config_icon = include_bytes!("../img/config.png");
-        let checkmark_icon = include_bytes!("../img/checkmark.png");
-        let projects_list = center(scrollable(
-            column(
-                self.pomo
-                    .projects
-                    .get_all_tree_style()
-                    .into_iter()
-                    .map(|(depth, p)| {
-                        if self
-                            .pomo
-                            .projects
-                            .get_edited_id()
-                            .map_or(false, |edited_id| edited_id == p.id)
-                        {
-                            row![
-                                text_input(
-                                    "Project Name",
-                                    &self
-                                        .pomo
-                                        .projects
-                                        .get_edited()
-                                        .map(|p| p.name.as_str())
-                                        .unwrap_or_default()
-                                )
-                                .font(iced::Font::MONOSPACE)
-                                .on_input(Message::EditProjectNameInput),
-                                right(
-                                    button(
-                                        image(image::Handle::from_bytes(&checkmark_icon[..]))
-                                            .height(20)
-                                            .width(20)
-                                    )
-                                    .on_press(Message::EditProjectFinish)
-                                )
-                            ]
-                            .into()
-                        } else {
-                            row![
-                                text(
-                                    (0..depth)
-                                        .map(|_| "  ")
-                                        .chain(iter::once("▹"))
-                                        .collect::<String>()
-                                        + &p.name
-                                )
-                                .font(iced::Font::MONOSPACE),
-                                right(
-                                    button(
-                                        image(image::Handle::from_bytes(&config_icon[..]))
-                                            .height(20)
-                                            .width(20)
-                                    )
-                                    .on_press_maybe(
-                                        if self.pomo.projects.get_edited_id().is_none() {
-                                            Some(Message::EditProjectInitiate(p.id))
-                                        } else {
-                                            None
-                                        }
-                                    )
-                                )
-                            ]
-                            .into()
-                        }
-                    }),
-            )
-            .padding(20),
-        ));
+        let add_icon = include_bytes!("../img/add.png");
+        let remove_icon = include_bytes!("../img/remove.png");
+        let okay_icon = include_bytes!("../img/okay.png");
 
-        projects_list.into()
+        let projects_list = column(self.pomo.projects.get_all_tree_style().into_iter().map(
+            |(depth, p)| {
+                if self
+                    .pomo
+                    .projects
+                    .get_edited_id()
+                    .map_or(false, |edited_id| edited_id == p.id)
+                {
+                    row![
+                        text_input(
+                            "Project Name",
+                            &self
+                                .pomo
+                                .projects
+                                .get_edited()
+                                .map(|p| p.name.as_str())
+                                .unwrap()
+                        )
+                        .font(iced::Font::MONOSPACE)
+                        .on_input(Message::EditProjectNameInput),
+                        right(row![
+                            button(
+                                image(image::Handle::from_bytes(&okay_icon[..]))
+                                    .height(16)
+                                    .width(16)
+                            )
+                            .on_press(Message::EditProjectFinish),
+                            button(
+                                image(image::Handle::from_bytes(&remove_icon[..]))
+                                    .height(16)
+                                    .width(16)
+                            )
+                            .on_press(Message::EditProjectDelete),
+                        ])
+                    ]
+                    .height(32)
+                    .into()
+                } else {
+                    row![
+                        text(
+                            (0..depth)
+                                .map(|_| "  ")
+                                .chain(iter::once("▹"))
+                                .collect::<String>()
+                                + &p.name
+                        )
+                        .font(iced::Font::MONOSPACE),
+                        right(if self.pomo.projects.get_edited_id().is_none() {
+                            row![
+                                button(
+                                    image(image::Handle::from_bytes(&config_icon[..]))
+                                        .height(16)
+                                        .width(16)
+                                )
+                                .on_press(Message::EditProjectInitiate(p.id)),
+                                button(
+                                    image(image::Handle::from_bytes(&add_icon[..]))
+                                        .height(16)
+                                        .width(16)
+                                )
+                                .on_press(Message::NewProject { parent: Some(p.id) })
+                            ]
+                        } else {
+                            row![]
+                        })
+                    ]
+                    .height(32)
+                    .into()
+                }
+            },
+        ))
+        .spacing(3)
+        .max_width(500);
+
+        let new_button = button("+ New").on_press(Message::NewProject { parent: None });
+
+        scrollable(column![center_x(projects_list), center_x(new_button)].padding(20)).into()
     }
 
     fn stats_tab_view(&self) -> Element<Message> {

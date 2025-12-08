@@ -56,10 +56,11 @@ pub fn get_projects(db: &Connection) -> Result<Vec<Project>> {
     projects
 }
 
-pub fn add_project(db: &Connection, project: &Project) -> Result<usize> {
-    db.execute(
-        "INSERT INTO projects (name, target_hours, parent) VALUES (?1, ?2, ?3)",
-        (&project.name, project.target_hours, project.parent),
+pub fn add_project(db: &Connection, parent: Option<usize>) -> Result<usize> {
+    db.query_row(
+        "INSERT INTO projects (name, parent) VALUES (?1, ?2) RETURNING id",
+        ("", parent),
+        |row| row.get(0),
     )
 }
 
@@ -77,8 +78,8 @@ pub fn update_project(db: &Connection, project: &Project) -> Result<usize> {
     )
 }
 
-pub fn delete_project(db: &Connection, project: &Project) -> Result<usize> {
-    db.execute("DELETE FROM projects WHERE id = ?1", (project.id,))
+pub fn delete_project(db: &Connection, id: usize) -> Result<usize> {
+    db.execute("DELETE FROM projects WHERE id = ?1", (id,))
 }
 
 pub struct WorkSession {
