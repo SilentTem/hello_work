@@ -1,0 +1,134 @@
+# .github/workflows/release.yml
+name: All
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  build:
+    permissions:
+      contents: write
+    name: Build Release Binaries
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            name: hello_work-${{ github.ref_name }}-x86_64-linux.tar.xz
+            os: ubuntu-latest
+          - target: x86_64-apple-darwin
+            name: hello_work-${{ github.ref_name }}-x86_64-osx.dmg
+            os: macos-latest
+          - target: aarch64-apple-darwin
+            name: hello_work-${{ github.ref_name }}-aarch64-osx.dmg
+            os: macos-latest
+          - target: x86_64-pc-windows-gnu
+            name: hello_work-${{ github.ref_name }}-x86_64-windows.zip
+            os: windows-latest
+            PKG_CONFIG_SYSROOT_DIR: 'C:/my_msys2/msys64/mingw64/'
+            PKG_CONFIG_PATH: 'C:/my_msys2/msys64/mingw64/lib/pkgconfig/'
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Setup | Checkout
+        uses: actions/checkout@v4
+      - name: Setup | Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Setup | Install Dependencies | Linux
+        if: matrix.os == 'ubuntu-latest'
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y
+          build-essential pkg-config libfontconfig1-dev libfontconfig-dev
+      #- name: Setup | Install Dependencies | MacOS
+      #  if: matrix.os == 'macos-latest'
+      #  run: brew install gtk4
+      # - name: Setup | Install Dependencies | MacOS-aarch64
+      #   if: matrix.target == 'aarch64-apple-darwin'
+      #   run: |-
+      #     brew fetch --force --bottle-tag=arm64_big_sur gtk4 gdk-pixbuf graphene hicolor-icon-theme libepoxy fribidi pango
+      #      brew --cache --bottle-tag=arm64_big_sur gtk4 gdk-pixbuf graphene hicolor-icon-theme libepoxy fribidi pango
+      - name: Setup | Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+          # profile: minimal is the default for dtolnay/rust-toolchain
+          # override: true is the default for dtolnay/rust-toolchain
+      - name: Build
+        shell: bash
+        env:
+          PKG_CONFIG_SYSROOT_DIR: ${{matrix.PKG_CONFIG_SYSROOT_DIR}}
+          PKG_CONFIG_PATH: ${{matrix.PKG_CONFIG_PATH}}
+        run: |
+          BUILD_COMMAND="cargo"
+          if [[ "${{ matrix.os }}" == "ubuntu-latest" && "${{ matrix.target }}" != "x86_64-unknown-linux-gnu" ]]; then
+            # Install 'cross' if needed for cross-compilation on Linux
+            cargo install cross --git https://github.com/cross-rs/cross --tag v0.2.6
+            BUILD_COMMAND="cross"
+          fi
+
+          $BUILD_COMMAND build --release --locked --target ${{ matrix.target }}
+          
+      - name: PostBuild | Prepare | MacOS
+        if: matrix.os == 'macos-latest'
+        run: |-
+          mkdir pkg
+          cd pkg
+          APP_NAME=hello_work
+          # MACOS_BIN_NAME=hello_work-bin
+          MACOS_APP_NAME=HelloWork
+          MACOS_APP_DIR=$MACOS_APP_NAME.app
+
+          echo "Creating app directory structure"
+          mkdir -p $MACOS_APP_DIR/Contents/MacOS
+
+          echo "Copying binary"
+          # MACOS_APP_BIN=$MACOS_APP_DIR/Contents/MacOS/$MACOS_BIN_NAME
+          cp ../target/${{ matrix.target }}/release/$APP_NAME $MACOS_APP_DIR/Contents/MacOS/$MACOS_APP_NAME
+
+          # echo "Creating Icon"
+          # iconset=icon.iconset
+          # mkdir -p "${iconset}"
+          #
+          # for s in 16 32 128 256 512; do
+          #   d=$(($s*2))
+          #   sips -Z $s "../img/hello_work.png" --out "${iconset}/icon_${s}x$s.png"
+          #   sips -Z $d "../img/hello_work.png" --out "${iconset}/icon_${s}x$s@2x.png"
+          # done
+          #
+          # iconutil -c icns $iconset
+          # mkdir -p $MACOS_APP_DIR/Contents/Resources
+          # mv icon.icns $MACOS_APP_DIR/Contents/Resources/
+          # mv resources/Info.plist $MACOS_APP_DIR/Contents/
+
+          echo "Creating dmg"
+          mkdir -p $MACOS_APP_NAME
+          cp -r $MACOS_APP_DIR $MACOS_APP_NAME/
+          rm -rf $MACOS_APP_NAME/.Trashes
+
+          hdiutil create ../${{ matrix.name }} -srcfolder $MACOS_APP_NAME -ov
+          cd -
+      - name: PostBuild | Prepare | Linux
+        if: matrix.os == 'ubuntu-latest'
+        run: |-
+          mkdir pkg
+          cp target/${{ matrix.target }}/release/hello_work pkg/
+          cd pkg
+          tar -cJvf ../${{ matrix.name }} hello_work 
+          cd -
+      - name: PostBuild | Prepare | Windows
+        if: matrix.os == 'windows-latest'
+        run: |-
+          mkdir hello_work
+          cp target/${{ matrix.target }}/release/hello_work.exe hello_work/
+          7z a -r ${{ matrix.name }} hello_work
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.name }}
